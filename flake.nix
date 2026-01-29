@@ -1,14 +1,30 @@
 {
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-  inputs.flake-utils.url = "github:numtide/flake-utils";
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+    naersk = {
+      url = "github:nix-community/naersk";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
 
   outputs =
-    { nixpkgs, flake-utils, ... }:
+    {
+      nixpkgs,
+      flake-utils,
+      naersk,
+      ...
+    }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        naersk' = pkgs.callPackage naersk { };
+
         nativeBuildInputs = with pkgs; [
+          # rustc
+          # cargo
+
           just
           pkg-config
           libxkbcommon
@@ -21,8 +37,14 @@
         ];
       in
       {
-        packages.default = pkgs.callPackage ./package.nix { };
-        devShells.default = pkgs.mkShell {
+        # For `nix build` & `nix run`:
+        packages.default = naersk'.buildPackage {
+          src = ./.;
+          gitSubmodules = true;
+        };
+
+        # For `nix develop` (optional, can be skipped):
+        devShell = pkgs.mkShell {
           packages = nativeBuildInputs ++ buildInputs;
           LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputs;
         };
